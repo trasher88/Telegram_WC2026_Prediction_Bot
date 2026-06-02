@@ -5,12 +5,15 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 
-from config import TOKEN, ENABLE_API_SYNC
+from config import TOKEN, ENABLE_API_SYNC, TELEGRAM_API_BASE_URL
 from db import init_db
 from handlers.leaderboard import router as lb_router
 from handlers.player_stats import router as player_stats_router
 from handlers.user import router as user_router
 from scheduler import setup_scheduler, sync_matches
+
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 
 
 if sys.platform.startswith("win"):
@@ -23,7 +26,14 @@ async def main():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
 
-    bot = Bot(token=TOKEN)
+    if TELEGRAM_API_BASE_URL:
+        session = AiohttpSession(
+            api=TelegramAPIServer.from_base(TELEGRAM_API_BASE_URL)
+        )
+        bot = Bot(token=TOKEN, session=session)
+    else:
+        bot = Bot(token=TOKEN)
+
     dp = Dispatcher()
 
     dp.include_router(user_router)
