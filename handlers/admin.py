@@ -31,6 +31,17 @@ from handlers.keyboards import STAGE_TITLES, tournament_stage_keyboard
 
 from utils.formatter import format_moscow_datetime
 
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from config import APP_TIMEZONE
+from services.daily_results import (
+    build_daily_results_summary,
+    previous_game_day,
+    reset_daily_results_notification,
+    send_daily_results_summary,
+)
+
 from config import ENABLE_API_SYNC
 
 router = Router()
@@ -62,7 +73,9 @@ async def admin_menu(msg: types.Message):
         "/test_lock match_id — закрыть прогнозы и отправить lock-рассылку\n\n"
 
         "📣 <b>Рассылки</b>\n"
-        "/broadcast текст — отправить сообщение всем пользователям\n\n"
+        "/broadcast текст — отправить сообщение всем пользователям\n"
+        "/daily_results — предпросмотр итогов прошлого игрового дня\n"
+        "/daily_results_send — отправить итоги прошлого игрового дня всем\n\n"
 
         "👥 <b>Пользователи и статистика</b>\n"
         "/users — список и активность пользователей\n"
@@ -446,3 +459,47 @@ async def test_lock_cmd(msg: types.Message):
     )
 
     await msg.answer("✅ Матч закрыт, lock-рассылка отправлена")
+
+
+@router.message(Command("daily_results"))
+async def daily_results_preview_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    game_day = previous_game_day()
+
+    text, error = await build_daily_results_summary(game_day)
+
+    if error:
+        await msg.answer(f"⚠️ {error}")
+        return
+
+    if not text:
+        await msg.answer("⚠️ Итоги игрового дня пустые")
+        return
+
+    await _send_long_admin_text(msg, text)
+
+
+@router.message(Command("daily_results_send"))
+async def daily_results_send_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    game_day = previous_game_day()
+
+    await reset_daily_results_notification(game_day)
+
+    await msg.answer(
+        "📊 Отправляю итоги прошлого игрового дня всем пользователям..."
+    )
+
+    await send_daily_results_summary(
+        bot=msg.bot,
+        game_day=game_day,
+        force=True,
+    )
+
+    await msg.answer("✅ Итоги игрового дня отправлены")

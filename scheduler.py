@@ -13,6 +13,7 @@ from services.daily_notifications import (
     send_daily_matches_digest,
     send_missing_predictions_reminder,
 )
+from services.daily_results import send_daily_results_summary
 from services.match_broadcasts import send_result_predictions_broadcast
 from services.scoring import process_finished_match
 
@@ -103,33 +104,48 @@ def schedule_match_jobs(bot: Bot, match_id: int, start_time: str):
 def schedule_daily_notification_jobs(bot: Bot):
     tz = ZoneInfo(APP_TIMEZONE)
 
+    # 13:00 МСК — итоги прошедшего игрового дня
     scheduler.add_job(
-        send_daily_matches_digest,
+        send_daily_results_summary,
         "cron",
-        hour=19,  # 13
-        minute=30,  # 0
+        hour=13,
+        minute=0,
         timezone=tz,
         args=[bot],
-        id="daily_digest_13_msk",
+        id="daily_results_13_msk",
         replace_existing=True,
     )
 
+    # 14:00 МСК — расписание текущего игрового дня
+    scheduler.add_job(
+        send_daily_matches_digest,
+        "cron",
+        hour=14,
+        minute=0,
+        timezone=tz,
+        args=[bot],
+        id="daily_digest_14_msk",
+        replace_existing=True,
+    )
+
+    # 18:00 МСК — напоминание тем, кто ещё не поставил прогнозы
     scheduler.add_job(
         send_missing_predictions_reminder,
         "cron",
-        hour=20,  # 18
-        minute=0,  # 0
+        hour=18,
+        minute=0,
         timezone=tz,
         args=[bot],
         id="daily_missing_predictions_18_msk",
         replace_existing=True,
     )
 
+    # 18:30 МСК — админский отчёт
     scheduler.add_job(
         send_admin_daily_prediction_report,
         "cron",
-        hour=20,  # 18
-        minute=30,  # 30
+        hour=18,
+        minute=30,
         timezone=tz,
         args=[bot],
         id="daily_admin_prediction_report_1830_msk",
