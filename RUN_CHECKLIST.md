@@ -1,16 +1,43 @@
-# Run Checklist — запуск и проверка проекта
+# Run Checklist — запуск, проверка и деплой
 
-Практический чек-лист для локального теста, smoke-test и подготовки к боевому запуску Telegram-бота прогнозов ЧМ-2026.
+Практический чек-лист для локального теста, серверного запуска и боевого режима Telegram-бота прогнозов ЧМ-2026.
 
----
+## 0. Проверка перед GitHub
 
-## 1. Создать виртуальное окружение
+Перед первым `git push` убедиться, что в репозиторий не попадут:
+
+```text
+.env
+*.db
+.idea/
+.venv/
+__pycache__/
+*.pyc
+```
+
+Проверить:
+
+```bash
+git status
+git ls-files
+```
+
+Если файл уже попал в индекс:
+
+```bash
+git rm --cached .env
+git rm --cached wc2026.db
+git rm --cached test_wc2026.db
+```
+
+## 1. Локальное окружение
 
 Linux/macOS:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
@@ -19,213 +46,231 @@ Windows PowerShell:
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
+## 2. Переменные окружения
 
-## 2. Задать переменные окружения
+Проект читает настройки через `os.getenv()`.
 
-Проект читает переменные через `os.getenv()`.
-
-Если в проект не добавлен `python-dotenv`, файл `.env` сам по себе не загружается. Переменные нужно задать через терминал, IDE, systemd, Docker или вручную подключить загрузку `.env`.
-
-### Linux/macOS
+Если запускаешь вручную на Linux:
 
 ```bash
-export BOT_TOKEN="..."
-export FOOTBALL_DATA_API_TOKEN="..."
-export ADMIN_IDS="123456789"
-export APP_TIMEZONE="Europe/Moscow"
-export WEB_ADMIN_API_KEY="some-private-key"
-export DB_PATH="test_wc2026.db"
-export ENABLE_API_SYNC="0"
+set -a
+source .env
+set +a
 ```
 
-### Windows PowerShell
-
-```powershell
-$env:BOT_TOKEN="..."
-$env:FOOTBALL_DATA_API_TOKEN="..."
-$env:ADMIN_IDS="123456789"
-$env:APP_TIMEZONE="Europe/Moscow"
-$env:WEB_ADMIN_API_KEY="some-private-key"
-$env:DB_PATH="test_wc2026.db"
-$env:ENABLE_API_SYNC="0"
-```
-
----
-
-## 3. Режимы запуска
-
-### Локальный тестовый режим
+Пример тестового `.env`:
 
 ```env
-DB_PATH=test_wc2026.db
+BOT_TOKEN=123456789:telegram_bot_token
+FOOTBALL_DATA_API_TOKEN=disabled
+ADMIN_IDS=123456789
+APP_TIMEZONE=Europe/Moscow
+WEB_ADMIN_API_KEY=test-local-key
+
+DB_PATH=/root/wc2026/test/Telegram_WC2026_Prediction_Bot/test_wc2026.db
+ENABLE_API_SYNC=0
+
+TELEGRAM_API_BASE_URL=https://telegram-bot-api-proxi.6trasher6.workers.dev
+```
+
+Не писать inline-комментарии после значений:
+
+```env
+# плохо
+ENABLE_API_SYNC=0 # test
+
+# хорошо
+# test mode
 ENABLE_API_SYNC=0
 ```
 
-Используется для локальных тестов, ручного добавления матчей, проверки `/set_score`, `/leaderboard`, `/form`, `/my_stats` и защиты тестовой базы от API sync.
+## 3. Режимы запуска
+
+### Тестовый режим
+
+```env
+DB_PATH=.../test_wc2026.db
+ENABLE_API_SYNC=0
+FOOTBALL_DATA_API_TOKEN=disabled
+```
+
+Назначение:
+
+- не ходить в football-data API;
+- тестировать локальные/ручные матчи;
+- безопасно проверять `/set_score`, `/rebuild_scores`, `/leaderboard`, `/form`, `/my_stats`, `/daily_results`.
 
 ### Боевой режим
 
 ```env
-DB_PATH=wc2026.db
+DB_PATH=.../wc2026.db
 ENABLE_API_SYNC=1
+FOOTBALL_DATA_API_TOKEN=real_token
 ```
 
-Используется для настоящего турнира.
+Назначение:
 
----
+- синхронизировать матчи и результаты через football-data API;
+- обрабатывать завершённые матчи автоматически;
+- вести настоящий турнир.
 
-## 4. Проверить синтаксис
+## 4. Cloudflare Worker proxy для Telegram
+
+Если сервер не может подключиться к `api.telegram.org`, проверить Worker:
 
 ```bash
+set -a
+source .env
+set +a
+
+curl -sS --connect-timeout 10 --max-time 30 \
+"$TELEGRAM_API_BASE_URL/bot$BOT_TOKEN/getMe"
+```
+
+Ожидаемо:
+
+```json
+{"ok":true,"result":{...}}
+```
+
+Если корневой URL Worker открывается как `Not found`, это нормально. Если открывается `Hello World`, значит в Worker ещё стоит шаблонный код, а не proxy-код.
+
+## 5. Проверка синтаксиса
+
+Не запускать `compileall` по всей папке проекта, если внутри есть `.venv`:
+
+```bash
+# не рекомендуется на маленьком VPS
 python -m compileall -q .
 ```
 
-Ожидаемый результат: команда завершается без вывода и без ошибки.
-
----
-
-## 5. Проверить football-data API
+Правильно:
 
 ```bash
-python test_api.py
+python -m compileall -q main.py config.py db.py scheduler.py api_client.py handlers repositories services states utils
 ```
 
-Ожидаемый результат:
+## 6. Проверка football-data API
+
+В тестовом режиме этот шаг можно пропустить.
+
+В боевом режиме:
+
+```bash
+python tests/test_api.py
+```
+
+Ожидаемо:
 
 - HTTP status `200`;
-- в ответе есть данные API.
+- ответ содержит данные API.
 
 Если `401`, проблема в `FOOTBALL_DATA_API_TOKEN`.
 
----
-
-## 6. Запустить бота локально
+## 7. Ручной запуск
 
 ```bash
+cd /root/wc2026/test/Telegram_WC2026_Prediction_Bot
+source .venv/bin/activate
+set -a
+source .env
+set +a
+
 python main.py
 ```
 
-Ожидаемый результат:
-
-- БД создаётся или мигрируется;
-- бот пишет в лог `Bot started: @...`;
-- scheduler пишет `SCHEDULER READY`;
-- бот отвечает в Telegram.
-
----
-
-## 7. Smoke-test пользовательских команд
-
-### `/start`
-
 Ожидаемо:
 
-- при первом запуске бот просит имя;
-- после ввода имени показывает приветственное меню;
-- пользователь появляется в таблице `users`.
+```text
+Bot started: @...
+SCHEDULER READY
+```
 
-### `/rename`
+Остановить ручной запуск:
 
-Ожидаемо: имя меняется в leaderboard и статистике.
+```text
+Ctrl+C
+```
 
-### `/help`
+## 8. Smoke-test пользовательских команд
 
-Ожидаемо:
-
-- указаны очки 2/1/0;
-- указан lock за 5 минут;
-- указаны уведомления 13:00 / 18:00 / 18:30 МСК;
-- указано правило пенальти `+1`.
-
-### `/matches`
-
-Ожидаемо:
-
-- сначала появляются кнопки стадий/туров;
-- время отображается по Москве;
-- флаги видны;
-- завершённые матчи показывают счёт;
-- неизвестные матчи плей-офф могут отображаться в расписании.
-
-### `/predict`
-
-Ожидаемо:
-
-- пользователь выбирает стадию;
-- выбирает матч;
-- выбирает счёт кнопкой или вводит вручную;
-- получает подтверждение сохранения прогноза;
-- прогноз появляется в БД.
-
-Важно: матчи с неизвестными командами не должны появляться в выборе прогноза. Если нажать старую inline-кнопку такого матча, бот должен ответить, что команды ещё не определены.
-
-### `/my_predictions`
-
-Ожидаемо: будущие прогнозы отображаются как ожидающие результата, завершённые прогнозы показывают счёт и очки.
-
-### `/leaderboard`
-
-Ожидаемо:
-
-- отображаются очки;
-- рядом указано количество точных счетов;
-- рядом указано количество прогнозов;
-- при равных очках выше игрок с большим числом точных счетов.
-
-### `/form`
-
-Ожидаемо: показываются последние 10 завершённых прогнозов, результат, прогноз, очки и итог по форме.
-
-### `/my_stats`
-
-Ожидаемо: показывается карточка игрока, очки, точные счета, исходы, промахи, завершённые и ожидающие прогнозы, проценты и текущая серия.
-
----
-
-## 8. Smoke-test админских команд
-
-Проверь админом из `ADMIN_IDS`.
+Проверить в Telegram:
 
 | Команда | Что проверить |
 |---|---|
-| `/admin` | Показывает список админских команд. |
-| `/match_ids` | Сначала кнопки стадий/туров, затем ID матчей выбранного этапа. Время по Москве. |
-| `/match_info <match_id>` | Команды, статус, счёт, время, количество прогнозов, processed state. |
+| `/start` | При первом запуске бот просит имя, сохраняет `display_name`. |
+| `/rename` | Имя меняется в лидерборде и статистике. |
+| `/help` | Правила турнира, очки, игровой день, уведомления, пенальти. |
+| `/matches` | Кнопки стадий, московское время, флаги, русские названия. |
+| `/predict` | Выбор стадии, матча, счёта; прогноз сохраняется. |
+| `/my_predictions` | Прогнозы пользователя, статусы и очки. |
+| `/leaderboard` | Очки, точные счета, количество прогнозов, правильный порядок. |
+| `/form` | Последние 10 завершённых прогнозов. |
+| `/my_stats` | Карточка игрока и проценты. |
+
+Отдельно проверить: матчи с неизвестными командами не должны появляться в `/predict`, но могут отображаться в `/matches`.
+
+## 9. Smoke-test админских команд
+
+Проверить админом из `ADMIN_IDS`:
+
+| Команда | Что проверить |
+|---|---|
+| `/admin` | Список команд. |
+| `/match_ids` | Сначала кнопки стадий/туров, потом ID матчей. Время по Москве. |
+| `/match_info <match_id>` | Команды, статус, счёт, время, количество прогнозов, processed. |
 | `/set_score <match_id> <home> <away>` | Матч становится `finished`, `locked=1`, очки пересчитываются, результат рассылается. |
-| `/rebuild_scores` | Scores очищаются и пересчитываются по завершённым матчам. |
-| `/force_sync` | При `ENABLE_API_SYNC=0` команда не выполняется. При `1` запускает синхронизацию. |
-| `/users` | Возвращает аналитику пользователей. |
-| `/stats` | Возвращает админ-статистику турнира. |
-| `/broadcast <text>` | Отправляет сообщение всем пользователям тестовой/боевой базы. |
-| `/test_lock <match_id>` | Отправляет тестовое сообщение о закрытии прогнозов. |
+| `/rebuild_scores` | Полный пересчёт очков. |
+| `/force_sync` | При `ENABLE_API_SYNC=0` не выполняется; при `1` запускает API sync. |
+| `/daily_results` | Предпросмотр итогов прошлого игрового дня. |
+| `/daily_results_send` | Ручная отправка итогов всем пользователям. |
+| `/users` | Активность пользователей. |
+| `/stats` | Турнирная и системная статистика. |
+| `/broadcast <text>` | Массовая рассылка. |
+| `/test_lock <match_id>` | Закрытие прогнозов и lock-рассылка. |
 
----
+## 10. Проверка дневных уведомлений
 
-## 9. Проверить дневные уведомления
-
-В боевом режиме должны быть:
+Актуальное расписание:
 
 | Время МСК | Уведомление |
 |---|---|
-| 13:00 | список матчей игрового дня всем пользователям |
-| 18:00 | напоминание тем, кто не поставил все прогнозы |
-| 18:30 | админ-отчёт |
+| 13:00 | Итоги прошедшего игрового дня всем пользователям. |
+| 14:00 | Расписание текущего игрового дня всем пользователям. |
+| 18:00 | Напоминание тем, кто не поставил все прогнозы. |
+| 18:30 | Админский отчёт. |
 
-Для локального теста можно временно изменить cron-время в `scheduler.py`, но перед боевым запуском обязательно вернуть:
+Для теста можно временно поменять время cron-задач в `scheduler.py`, но перед боем вернуть:
 
 ```python
 hour=13, minute=0
+hour=14, minute=0
 hour=18, minute=0
 hour=18, minute=30
 ```
 
----
+## 11. Проверка итогов игрового дня
 
-## 10. Проверить правило пенальти
+Для тестовой базы:
+
+1. Убедиться, что в базе есть матчи прошедшего игрового дня.
+2. Поставить прогнозы несколькими пользователями.
+3. Закрыть матчи через `/set_score`.
+4. Выполнить `/daily_results`.
+5. Проверить формат сообщения.
+6. Выполнить `/daily_results_send`, если нужно отправить всем.
+
+Итоги не отправляются автоматически, если:
+
+- матчей за прошлый игровой день нет;
+- не все матчи прошедшего игрового дня `finished`;
+- у какого-то завершённого матча нет счёта.
+
+## 12. Проверка правила пенальти
 
 Ожидаемая логика:
 
@@ -235,64 +280,133 @@ fullTime 1:1, penalties 2:4 -> 1:2
 fullTime 2:1, penalties отсутствует -> 2:1
 ```
 
-Если матч выставляется вручную через `/set_score`, админ должен вводить уже итоговый турнирный счёт.
+Если результат выставляется вручную через `/set_score`, админ вводит уже итоговый турнирный счёт.
 
----
+## 13. Запуск через systemd
 
-## 11. Проверить web admin
+Создать unit:
+
+```bash
+nano /etc/systemd/system/wc2026-bot.service
+```
+
+Пример:
+
+```ini
+[Unit]
+Description=Telegram WC2026 Prediction Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/wc2026/test/Telegram_WC2026_Prediction_Bot
+EnvironmentFile=/root/wc2026/test/Telegram_WC2026_Prediction_Bot/.env
+ExecStart=/root/wc2026/test/Telegram_WC2026_Prediction_Bot/.venv/bin/python /root/wc2026/test/Telegram_WC2026_Prediction_Bot/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
 
 Запуск:
 
 ```bash
-uvicorn web_admin:app --host 127.0.0.1 --port 8000
+systemctl daemon-reload
+systemctl enable wc2026-bot
+systemctl start wc2026-bot
+systemctl status wc2026-bot
+journalctl -u wc2026-bot -f
 ```
 
-Проверка:
+Остановить:
 
 ```bash
-curl -H "X-API-Key: some-private-key" http://127.0.0.1:8000/matches
-curl -H "X-API-Key: some-private-key" http://127.0.0.1:8000/scores
+systemctl stop wc2026-bot
 ```
 
-Ожидаемо:
+Перезапустить:
 
-- с правильным `X-API-Key` endpoint отвечает;
-- без ключа возвращается ошибка авторизации;
-- без `WEB_ADMIN_API_KEY` endpoint возвращает ошибку конфигурации.
+```bash
+systemctl restart wc2026-bot
+```
 
----
+## 14. Обновление кода с GitHub
 
-## 12. Что считать успешной проверкой
+Локально:
 
-Проект можно переносить на VPS, если:
+```bash
+git add .
+git commit -m "Update bot"
+git push
+```
 
-- зависимости установились без конфликтов;
-- `python -m compileall -q .` проходит;
-- `python test_api.py` получает ответ API;
-- `python main.py` запускает бота;
-- Telegram-команды отвечают;
-- `/predict` сохраняет прогноз;
-- прогноз отображается в `/my_predictions`;
+На сервере:
+
+```bash
+cd /root/wc2026/test/Telegram_WC2026_Prediction_Bot
+systemctl stop wc2026-bot
+
+git pull
+
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m compileall -q main.py config.py db.py scheduler.py api_client.py handlers repositories services states utils
+
+systemctl start wc2026-bot
+journalctl -u wc2026-bot -f
+```
+
+## 15. Диагностика частых проблем
+
+### `Killed`
+
+Проверить:
+
+```bash
+dmesg -T | tail -50
+```
+
+Если есть `Out of memory`, добавить swap и не компилировать `.venv`.
+
+### Telegram timeout
+
+Прямой запрос может не работать:
+
+```bash
+curl https://api.telegram.org
+```
+
+Проверять через Worker:
+
+```bash
+curl -sS --connect-timeout 10 --max-time 30 \
+"$TELEGRAM_API_BASE_URL/bot$BOT_TOKEN/getMe"
+```
+
+### Два бота на одном сервере
+
+Для двух независимых турниров нужны разные:
+
+- папки проекта;
+- `BOT_TOKEN`;
+- `DB_PATH`;
+- `.env`;
+- systemd service names.
+
+Cloudflare Worker можно использовать один, если он не ограничен одним токеном.
+
+## 16. Критерии успешного запуска
+
+Проект готов к дальнейшему тестированию/бою, если:
+
+- синтаксис проходит;
+- Worker `getMe` возвращает `ok:true`;
+- `python main.py` запускается;
+- systemd service активен;
+- бот отвечает в Telegram;
+- прогноз сохраняется;
 - `/set_score` завершает матч и обновляет leaderboard;
-- `/form` и `/my_stats` считают корректно;
-- `/force_sync` защищён в тестовом режиме;
-- дневные уведомления проверены;
+- `/daily_results` строит корректный отчёт;
 - в логах нет повторяющихся tracebacks.
-
----
-
-## 13. Финальный чек перед боем
-
-Перед запуском на реальных пользователях:
-
-- `DB_PATH=wc2026.db`;
-- `ENABLE_API_SYNC=1`;
-- времена уведомлений в `scheduler.py`: `13:00`, `18:00`, `18:30`;
-- в ZIP/репозитории нет `.env`, `*.db`, `.idea`, `__pycache__`;
-- токены не попадали в публичные файлы;
-- `ADMIN_IDS` содержит только нужных админов;
-- web admin закрыт сильным `WEB_ADMIN_API_KEY`;
-- база скопирована/забэкаплена;
-- API проверен;
-- `/help` актуален;
-- тестовый пользовательский сценарий пройден.
