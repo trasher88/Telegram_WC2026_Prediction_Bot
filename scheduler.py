@@ -104,6 +104,18 @@ def schedule_match_jobs(bot: Bot, match_id: int, start_time: str):
 def schedule_daily_notification_jobs(bot: Bot):
     tz = ZoneInfo(APP_TIMEZONE)
 
+    if ENABLE_API_SYNC:
+        scheduler.add_job(
+            sync_matches,
+            "cron",
+            hour=12,
+            minute=55,
+            timezone=tz,
+            args=[bot],
+            id="sync_before_daily_results",
+            replace_existing=True,
+        )
+
     # 13:00 МСК — итоги прошедшего игрового дня
     scheduler.add_job(
         send_daily_results_summary,
@@ -304,7 +316,7 @@ async def setup_scheduler(bot):
         scheduler.add_job(
             sync_matches,
             "interval",
-            minutes=5,
+            minutes=15,
             args=[bot],
             id="sync_matches",
             replace_existing=True
