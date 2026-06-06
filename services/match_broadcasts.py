@@ -141,6 +141,7 @@ async def get_all_user_ids():
             """
             SELECT id
             FROM users
+            WHERE is_approved = 1
             """
         )
 
@@ -224,6 +225,7 @@ async def get_match_predictions(match_id: int):
             FROM predictions p
             JOIN users u ON u.id = p.user_id
             WHERE p.match_id = ?
+                AND u.is_approved = 1
             ORDER BY
                 u.display_name COLLATE NOCASE,
                 u.username COLLATE NOCASE,

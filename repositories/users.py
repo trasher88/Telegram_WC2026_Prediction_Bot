@@ -93,6 +93,14 @@ async def get_user_display_name(user_id: int) -> str | None:
 
 async def list_user_ids() -> list[int]:
     async with aiosqlite.connect(DB_PATH) as db:
-        rows = await (await db.execute("SELECT id FROM users")).fetchall()
+        rows = await (
+            await db.execute(
+                """
+                SELECT id
+                FROM users
+                WHERE is_approved = 1
+                """
+            )
+        ).fetchall()
 
     return [row[0] for row in rows]

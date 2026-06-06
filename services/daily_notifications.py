@@ -198,6 +198,7 @@ async def _get_users_prediction_status(match_ids: list[int]) -> list[dict]:
                     username,
                     first_name
                 FROM users
+                WHERE is_approved = 1
                 ORDER BY
                     display_name COLLATE NOCASE,
                     username COLLATE NOCASE,
@@ -290,7 +291,15 @@ async def send_daily_matches_digest(
         return
 
     async with aiosqlite.connect(DB_PATH) as db:
-        users = await (await db.execute("SELECT id FROM users")).fetchall()
+        users = await (
+            await db.execute(
+                """
+                SELECT id
+                FROM users
+                WHERE is_approved = 1
+                """
+            )
+        ).fetchall()
 
     lines = "\n".join(format_match_line(match) for match in matches)
 

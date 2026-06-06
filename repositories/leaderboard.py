@@ -33,6 +33,7 @@ WITH user_stats AS (
         ON u.id = p.user_id
     LEFT JOIN matches m
         ON p.match_id = m.id
+    WHERE u.is_approved = 1
     GROUP BY u.id
 )
 """

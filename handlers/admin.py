@@ -17,6 +17,7 @@ from repositories.matches import (
 )
 from repositories.predictions import count_predictions_for_match
 from repositories.users import list_user_ids
+from repositories.invites import approve_user, create_invite_code, revoke_user
 from scheduler import sync_matches
 from services.match_broadcasts import (
     reset_notification,
@@ -79,6 +80,9 @@ async def admin_menu(msg: types.Message):
 
         "👥 <b>Пользователи и статистика</b>\n"
         "/users — список и активность пользователей\n"
+        "/invite — создать одноразовую ссылку-приглашение\n"
+        "/approve user_id — разрешить пользователя\n"
+        "/revoke user_id — заблокировать пользователя\n"
         "/stats — статистика турнира и системы\n\n"
 
         "📌 <b>Примеры</b>\n"
@@ -338,7 +342,7 @@ async def stats_cmd(msg: types.Message):
     stats = await get_tournament_stats()
 
     text = (
-        "📊 <b>Статистика турнира</b>\n\n"
+        "📊 Статистика турнира\n\n"
 
         "⚽ Матчи:\n"
         f"• Всего: {stats['total_matches']}\n"
@@ -503,3 +507,60 @@ async def daily_results_send_cmd(msg: types.Message):
     )
 
     await msg.answer("✅ Итоги игрового дня отправлены")
+
+
+@router.message(Command("invite"))
+async def invite_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    code = await create_invite_code(msg.from_user.id)
+
+    bot_info = await msg.bot.get_me()
+    invite_link = f"https://t.me/{bot_info.username}?start={code}"
+
+    await msg.answer(
+        "🔗 <b>Ссылка-приглашение создана</b>\n\n"
+        f"<code>{invite_link}</code>\n\n"
+        "Ссылка одноразовая. После первого входа код будет использован.",
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("approve"))
+async def approve_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    parts = msg.text.split()
+
+    if len(parts) != 2 or not parts[1].isdigit():
+        await msg.answer("Использование: /approve user_id")
+        return
+
+    user_id = int(parts[1])
+
+    await approve_user(user_id)
+
+    await msg.answer(f"✅ Пользователь {user_id} получил доступ")
+
+
+@router.message(Command("revoke"))
+async def revoke_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    parts = msg.text.split()
+
+    if len(parts) != 2 or not parts[1].isdigit():
+        await msg.answer("Использование: /revoke user_id")
+        return
+
+    user_id = int(parts[1])
+
+    await revoke_user(user_id)
+
+    await msg.answer(f"⛔ Доступ пользователя {user_id} отключён")
