@@ -1,12 +1,16 @@
 # Telegram WC2026 Prediction Bot
 
-Telegram-бот для турнира прогнозов на Чемпионат мира 2026.
+Telegram-бот для закрытого турнира прогнозов на Чемпионат мира 2026.
 
-Проект рассчитан на private-friendly турнир между участниками: игроки ставят прогнозы на матчи, бот закрывает приём прогнозов перед стартом матчей, считает очки, отправляет результаты и показывает статистику.
+Проект рассчитан на приватный турнир между ограниченным кругом участников. Игроки попадают в бот только по одноразовой ссылке-приглашению, выбирают турнирное имя, ставят прогнозы на матчи, получают уведомления, видят таблицу лидеров, личную статистику и ежедневные итоги игрового дня.
 
 ## Основные возможности
 
-- регистрация игрока с турнирным именем при первом `/start`;
+- закрытый доступ только по invite-ссылкам;
+- одноразовые инвайт-коды через `/invite`;
+- ручное разрешение и отзыв доступа через `/approve` и `/revoke`;
+- middleware-защита всех команд и callback-кнопок от неразрешённых пользователей;
+- регистрация игрока с турнирным именем при первом входе;
 - изменение имени через `/rename`;
 - расписание матчей по стадиям и турам через `/matches`;
 - прогнозы через `/predict` с быстрыми кнопками счёта и ручным вводом;
@@ -21,11 +25,44 @@ Telegram-бот для турнира прогнозов на Чемпионат
 - админ-команды для диагностики, ручного счёта, пересчёта очков и рассылок;
 - опциональный Cloudflare Worker proxy для Telegram Bot API, если сервер не может ходить напрямую к `api.telegram.org`.
 
+## Пользовательский доступ
+
+Бот не предназначен для свободной регистрации.
+
+Новый пользователь без приглашения при `/start` получает отказ:
+
+```text
+⛔ Бот закрыт для свободной регистрации.
+
+Для участия нужна персональная ссылка-приглашение.
+```
+
+Администратор создаёт одноразовую ссылку:
+
+```text
+/invite
+```
+
+Бот возвращает ссылку вида:
+
+```text
+https://t.me/your_bot?start=ABCD1234
+```
+
+Пользователь переходит по ссылке, бот принимает код, устанавливает пользователю `is_approved = 1` и дальше запускает обычный сценарий регистрации имени.
+
+Если пользователь уже был добавлен, но доступ нужно выдать или забрать вручную:
+
+```text
+/approve user_id
+/revoke user_id
+```
+
 ## Пользовательские команды
 
 | Команда | Назначение |
 |---|---|
-| `/start` | Запуск бота, регистрация пользователя, ввод турнирного имени. |
+| `/start` | Запуск бота. Для новых игроков требуется invite-code. |
 | `/rename` | Изменить турнирное имя. |
 | `/help` | Правила турнира, очки, уведомления и команды. |
 | `/matches` | Расписание матчей по стадиям и групповым турам. |
@@ -40,15 +77,18 @@ Telegram-бот для турнира прогнозов на Чемпионат
 | Команда | Назначение |
 |---|---|
 | `/admin` | Список админских команд. |
+| `/invite` | Создать одноразовую ссылку-приглашение. |
+| `/approve user_id` | Разрешить пользователю доступ вручную. |
+| `/revoke user_id` | Заблокировать пользователю доступ. |
 | `/force_sync` | Принудительная синхронизация с football-data API. Заблокирована при `ENABLE_API_SYNC=0`. |
 | `/rebuild_scores` | Полный пересчёт очков по завершённым матчам. |
 | `/set_score match_id home away` | Ручная установка результата матча. |
 | `/match_info match_id` | Диагностика конкретного матча. |
 | `/match_ids` | ID матчей по стадиям и турам. |
 | `/test_lock match_id` | Принудительно закрыть прогнозы на матч и отправить lock-рассылку. |
-| `/broadcast текст` | Массовая рассылка всем пользователям. |
+| `/broadcast текст` | Массовая рассылка разрешённым пользователям. |
 | `/daily_results` | Предпросмотр итогов прошлого игрового дня для админа. |
-| `/daily_results_send` | Отправить итоги прошлого игрового дня всем пользователям вручную. |
+| `/daily_results_send` | Отправить итоги прошлого игрового дня всем разрешённым пользователям вручную. |
 | `/users` | Пользовательская активность и статистика. |
 | `/stats` | Техническая статистика турнира и системы. |
 
@@ -97,14 +137,13 @@ Telegram-бот для турнира прогнозов на Чемпионат
 13:00 МСК текущего дня — 12:59 МСК следующего дня
 ```
 
-
 ## Уведомления
 
 | Время МСК | Получатели | Содержание |
 |---|---|---|
-| 13:00 | Все игроки | Итоги прошедшего игрового дня. |
-| 14:00 | Все игроки | Расписание текущего игрового дня. |
-| 18:00 | Игроки с пропущенными прогнозами | Напоминание поставить прогнозы. |
+| 13:00 | Все разрешённые игроки | Итоги прошедшего игрового дня. |
+| 14:00 | Все разрешённые игроки | Расписание текущего игрового дня. |
+| 18:00 | Разрешённые игроки с пропущенными прогнозами | Напоминание поставить прогнозы. |
 | 18:30 | Администраторы | Отчёт: кто поставил, кто не поставил, кому чего не хватает. |
 
 Дополнительно бот отправляет:
@@ -121,7 +160,6 @@ Telegram-бот для турнира прогнозов на Чемпионат
 - количество точных счетов;
 - игрока дня;
 - текущий топ общей таблицы.
-
 
 Итоги отправляются только если все матчи прошедшего игрового дня завершены и имеют счёт.
 
@@ -143,6 +181,8 @@ Telegram-бот для турнира прогнозов на Чемпионат
 
 1. больше очков;
 2. при равных очках — больше точных счетов.
+
+В таблицу лидеров попадают только пользователи с `is_approved = 1`.
 
 ## `/form`
 
@@ -187,6 +227,30 @@ Telegram-бот для турнира прогнозов на Чемпионат
 - не появляются в `/predict`;
 - дополнительно блокируются на уровне `services/predictions.py`, если пользователь нажмёт старую inline-кнопку.
 
+## База данных и invite-only режим
+
+Текущая схема БД рассчитана на закрытый доступ.
+
+Ключевые элементы:
+
+- `users.is_approved` — разрешён ли пользователь;
+- `invite_codes` — одноразовые invite-коды;
+- `daily_notifications` — защита от повторных дневных рассылок;
+- `match_notifications` — защита от повторных match-уведомлений;
+- `processed_matches` — защита от повторного начисления очков.
+
+Если используется чистый `db.py` без миграций, старые SQLite-базы с прежней структурой использовать нельзя без ручной миграции. Для нового турнира проще создать новую базу.
+
+Перед пересозданием базы на сервере:
+
+```bash
+systemctl stop wc2026-bot
+cp wc2026.db wc2026_backup_$(date +%Y%m%d_%H%M).db
+mv wc2026.db wc2026_old.db
+```
+
+При следующем запуске бот создаст новую базу с актуальной структурой.
+
 ## Переменные окружения
 
 | Переменная | Назначение |
@@ -212,7 +276,22 @@ WEB_ADMIN_API_KEY=test-local-key
 DB_PATH=/root/wc2026/test/Telegram_WC2026_Prediction_Bot/test_wc2026.db
 ENABLE_API_SYNC=0
 
-TELEGRAM_API_BASE_URL=https://telegram-bot-api-proxi.user32678.workers.dev
+TELEGRAM_API_BASE_URL=https://telegram-bot-api-proxi.example.workers.dev
+```
+
+Пример боевого `.env`:
+
+```env
+BOT_TOKEN=123456789:telegram_bot_token
+FOOTBALL_DATA_API_TOKEN=football_data_token
+ADMIN_IDS=123456789
+APP_TIMEZONE=Europe/Moscow
+WEB_ADMIN_API_KEY=strong-secret-key
+
+DB_PATH=/root/wc2026/friends/Telegram_WC2026_Prediction_Bot/friends_wc2026.db
+ENABLE_API_SYNC=1
+
+TELEGRAM_API_BASE_URL=https://telegram-bot-api-proxi.example.workers.dev
 ```
 
 ## Cloudflare Worker для Telegram API
@@ -254,6 +333,10 @@ export default {
 Проверка:
 
 ```bash
+set -a
+source .env
+set +a
+
 curl -sS --connect-timeout 10 --max-time 30 "$TELEGRAM_API_BASE_URL/bot$BOT_TOKEN/getMe"
 ```
 
@@ -274,7 +357,7 @@ set -a
 source .env
 set +a
 
-python -m compileall -q main.py config.py db.py scheduler.py api_client.py handlers repositories services states utils
+python -m compileall -q main.py config.py db.py scheduler.py api_client.py handlers repositories services states utils middleware
 python main.py
 ```
 
@@ -289,12 +372,14 @@ python main.py
 Description=Telegram WC2026 Prediction Bot
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
 
 [Service]
 Type=simple
-WorkingDirectory=/root/wc2026/test/Telegram_WC2026_Prediction_Bot
-EnvironmentFile=/root/wc2026/test/Telegram_WC2026_Prediction_Bot/.env
-ExecStart=/root/wc2026/test/Telegram_WC2026_Prediction_Bot/.venv/bin/python /root/wc2026/test/Telegram_WC2026_Prediction_Bot/main.py
+WorkingDirectory=/root/wc2026/friends/Telegram_WC2026_Prediction_Bot
+EnvironmentFile=/root/wc2026/friends/Telegram_WC2026_Prediction_Bot/.env
+ExecStart=/root/wc2026/friends/Telegram_WC2026_Prediction_Bot/.venv/bin/python /root/wc2026/friends/Telegram_WC2026_Prediction_Bot/main.py
 Restart=always
 RestartSec=10
 
@@ -310,4 +395,27 @@ systemctl enable wc2026-bot
 systemctl start wc2026-bot
 systemctl status wc2026-bot
 journalctl -u wc2026-bot -f
+```
+
+Минимальный `.gitignore`:
+
+```gitignore
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
+.venv/
+venv/
+__pycache__/
+*.pyc
+.idea/
+*.log
+```
+
+Перед `git push`:
+
+```bash
+git status
+git ls-files
 ```
