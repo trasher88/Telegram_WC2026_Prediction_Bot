@@ -214,6 +214,15 @@ async def sync_matches(bot):
                         m.get("score") or {}
                     )
 
+                    status_for_db = status
+
+                    if status == "finished" and (home_score is None or away_score is None):
+                        print(
+                            f"FINISHED MATCH WITHOUT SCORE: "
+                            f"{match_id} {home_team} - {away_team}"
+                        )
+                        status_for_db = "timed"
+
                     if not match_id:
                         print("MATCH SKIPPED: no id")
                         continue
@@ -241,15 +250,15 @@ async def sync_matches(bot):
                             status = excluded.status,
                             stage = excluded.stage,
                             matchday = excluded.matchday,
-                            home_score = excluded.home_score,
-                            away_score = excluded.away_score
+                            home_score = COALESCE(excluded.home_score, matches.home_score),
+                            away_score = COALESCE(excluded.away_score, matches.away_score)
                         """,
                         (
                             match_id,
                             home_team,
                             away_team,
                             utc_date,
-                            status,
+                            status_for_db,
                             stage,
                             matchday,
                             home_score,
@@ -257,8 +266,9 @@ async def sync_matches(bot):
                         )
                     )
 
-                    if status == "finished":
+                    if status_for_db == "finished":
                         finished_match_ids.append(match_id)
+
                     elif utc_date:
                         matches_to_schedule.append((match_id, utc_date))
 
