@@ -16,6 +16,7 @@ from services.daily_notifications import (
 from services.daily_results import send_daily_results_summary
 from services.match_broadcasts import send_result_predictions_broadcast
 from services.scoring import process_finished_match
+from services.match_broadcasts import send_lock_predictions_broadcast
 
 scheduler = AsyncIOScheduler()
 api = APIClient()
@@ -97,7 +98,7 @@ def schedule_match_jobs(bot: Bot, match_id: int, start_time: str):
         lock_predictions,
         start - timedelta(minutes=5),
         f"lock:{match_id}",
-        [match_id]
+        [bot, match_id],
     )
 
 
@@ -290,7 +291,7 @@ async def sync_matches(bot):
 # ===============
 # LOCK PREDICTIONS
 # ===============
-async def lock_predictions(match_id: int):
+async def lock_predictions(bot: Bot, match_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
@@ -298,12 +299,17 @@ async def lock_predictions(match_id: int):
             SET locked = 1
             WHERE id = ?
             """,
-            (match_id,)
+            (match_id,),
         )
 
         await db.commit()
 
-    print(f"Predictions locked for match {match_id}")
+    await send_lock_predictions_broadcast(
+        bot=bot,
+        match_id=match_id,
+    )
+
+    print(f"Predictions locked and broadcast sent for match {match_id}")
 
 
 # ===============
