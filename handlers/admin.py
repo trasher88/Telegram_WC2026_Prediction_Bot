@@ -43,6 +43,13 @@ from services.daily_results import (
     send_daily_results_summary,
 )
 
+from services.round_stats import (
+    build_group_round_stats_summary,
+    build_stage_stats_summary,
+    send_group_round_stats_summary,
+    send_stage_stats_summary,
+)
+
 from config import ENABLE_API_SYNC
 
 router = Router()
@@ -75,6 +82,10 @@ async def admin_menu(msg: types.Message):
 
         "📣 <b>Рассылки</b>\n"
         "/broadcast текст — отправить сообщение всем пользователям\n"
+        "/round_stats matchday — предпросмотр статистики группового тура\n"
+        "/round_stats_send matchday — отправить статистику группового тура всем\n"
+        "/stage_stats stage — предпросмотр статистики стадии плей-офф\n"
+        "/stage_stats_send stage — отправить статистику стадии плей-офф всем\n"
         "/daily_results — предпросмотр итогов прошлого игрового дня\n"
         "/daily_results_send — отправить итоги прошлого игрового дня всем\n\n"
 
@@ -89,7 +100,17 @@ async def admin_menu(msg: types.Message):
         "<code>/set_score 537357 2 2</code>\n"
         "<code>/match_info 537357</code>\n"
         "<code>/test_lock 537357</code>\n"
-        "<code>/broadcast Всем привет!</code>"
+        "<code>/broadcast Всем привет!</code>\n"
+        "Рассылка статистики"
+        "/round_stats 1\n"
+        "/round_stats 2\n"
+        "/round_stats 3\n"
+        "/stage_stats 1_16\n"
+        "/stage_stats 1_8\n"
+        "/stage_stats 1_4\n"
+        "/stage_stats 1_2\n"
+        "/stage_stats third\n"
+        "/stage_stats final\n"
     )
 
     await msg.answer(text, parse_mode="HTML")
@@ -564,3 +585,145 @@ async def revoke_cmd(msg: types.Message):
     await revoke_user(user_id)
 
     await msg.answer(f"⛔ Доступ пользователя {user_id} отключён")
+
+
+@router.message(Command("round_stats"))
+async def round_stats_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    parts = msg.text.split()
+
+    if len(parts) != 2 or not parts[1].isdigit():
+        await msg.answer(
+            "Использование: /round_stats matchday\n"
+            "Например: /round_stats 1"
+        )
+        return
+
+    matchday = int(parts[1])
+
+    text, error = await build_group_round_stats_summary(
+        matchday=matchday,
+    )
+
+    if error:
+        await msg.answer(f"⚠️ {error}")
+        return
+
+    if not text:
+        await msg.answer("⚠️ Отчёт пустой")
+        return
+
+    await _send_long_admin_text(msg, text)
+
+
+@router.message(Command("round_stats_send"))
+async def round_stats_send_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    parts = msg.text.split()
+
+    if len(parts) != 2 or not parts[1].isdigit():
+        await msg.answer(
+            "Использование: /round_stats_send matchday\n"
+            "Например: /round_stats_send 1"
+        )
+        return
+
+    matchday = int(parts[1])
+
+    await msg.answer(
+        f"📊 Отправляю статистику {matchday}-го группового тура всем пользователям..."
+    )
+
+    ok, error = await send_group_round_stats_summary(
+        bot=msg.bot,
+        matchday=matchday,
+    )
+
+    if not ok:
+        await msg.answer(f"⚠️ {error}")
+        return
+
+    await msg.answer("✅ Статистика группового тура отправлена")
+
+
+@router.message(Command("stage_stats"))
+async def stage_stats_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    parts = msg.text.split()
+
+    if len(parts) != 2:
+        await msg.answer(
+            "Использование: /stage_stats stage\n\n"
+            "Примеры:\n"
+            "/stage_stats 1_16\n"
+            "/stage_stats 1_8\n"
+            "/stage_stats 1_4\n"
+            "/stage_stats 1_2\n"
+            "/stage_stats third\n"
+            "/stage_stats final"
+        )
+        return
+
+    raw_stage = parts[1]
+
+    text, error = await build_stage_stats_summary(
+        raw_stage=raw_stage,
+    )
+
+    if error:
+        await msg.answer(f"⚠️ {error}")
+        return
+
+    if not text:
+        await msg.answer("⚠️ Отчёт пустой")
+        return
+
+    await _send_long_admin_text(msg, text)
+
+
+@router.message(Command("stage_stats_send"))
+async def stage_stats_send_cmd(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer(T.ACCESS_DENIED)
+        return
+
+    parts = msg.text.split()
+
+    if len(parts) != 2:
+        await msg.answer(
+            "Использование: /stage_stats_send stage\n\n"
+            "Примеры:\n"
+            "/stage_stats_send 1_16\n"
+            "/stage_stats_send 1_8\n"
+            "/stage_stats_send 1_4\n"
+            "/stage_stats_send 1_2\n"
+            "/stage_stats_send third\n"
+            "/stage_stats_send final"
+        )
+        return
+
+    raw_stage = parts[1]
+
+    await msg.answer(
+        f"📊 Отправляю статистику этапа {raw_stage} всем пользователям..."
+    )
+
+    ok, error = await send_stage_stats_summary(
+        bot=msg.bot,
+        raw_stage=raw_stage,
+    )
+
+    if not ok:
+        await msg.answer(f"⚠️ {error}")
+        return
+
+    await msg.answer("✅ Статистика этапа отправлена")
