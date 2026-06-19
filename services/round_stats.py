@@ -13,37 +13,121 @@ from utils.user_names import user_display_name
 
 
 STAGE_ALIASES = {
-    "1_16": (["LAST_32"], "1/16 финала"),
-    "1/16": (["LAST_32"], "1/16 финала"),
-    "last32": (["LAST_32"], "1/16 финала"),
-    "last_32": (["LAST_32"], "1/16 финала"),
-    "last-32": (["LAST_32"], "1/16 финала"),
+    # 1/16 финала
+    "1_16": (
+        ["LAST_32", "ROUND_OF_32"],
+        "1/16 финала",
+    ),
+    "1/16": (
+        ["LAST_32", "ROUND_OF_32"],
+        "1/16 финала",
+    ),
+    "last32": (
+        ["LAST_32", "ROUND_OF_32"],
+        "1/16 финала",
+    ),
+    "last_32": (
+        ["LAST_32", "ROUND_OF_32"],
+        "1/16 финала",
+    ),
+    "round_of_32": (
+        ["LAST_32", "ROUND_OF_32"],
+        "1/16 финала",
+    ),
 
-    "1_8": (["LAST_16"], "1/8 финала"),
-    "1/8": (["LAST_16"], "1/8 финала"),
-    "last16": (["LAST_16"], "1/8 финала"),
-    "last_16": (["LAST_16"], "1/8 финала"),
-    "last-16": (["LAST_16"], "1/8 финала"),
+    # 1/8 финала
+    "1_8": (
+        ["LAST_16", "ROUND_OF_16"],
+        "1/8 финала",
+    ),
+    "1/8": (
+        ["LAST_16", "ROUND_OF_16"],
+        "1/8 финала",
+    ),
+    "last16": (
+        ["LAST_16", "ROUND_OF_16"],
+        "1/8 финала",
+    ),
+    "last_16": (
+        ["LAST_16", "ROUND_OF_16"],
+        "1/8 финала",
+    ),
+    "round_of_16": (
+        ["LAST_16", "ROUND_OF_16"],
+        "1/8 финала",
+    ),
 
-    "1_4": (["QUARTER_FINALS"], "1/4 финала"),
-    "1/4": (["QUARTER_FINALS"], "1/4 финала"),
-    "quarter": (["QUARTER_FINALS"], "1/4 финала"),
-    "quarters": (["QUARTER_FINALS"], "1/4 финала"),
-    "quarter_finals": (["QUARTER_FINALS"], "1/4 финала"),
+    # 1/4 финала
+    "1_4": (
+        ["QUARTER_FINALS", "QUARTER_FINAL"],
+        "1/4 финала",
+    ),
+    "1/4": (
+        ["QUARTER_FINALS", "QUARTER_FINAL"],
+        "1/4 финала",
+    ),
+    "quarter": (
+        ["QUARTER_FINALS", "QUARTER_FINAL"],
+        "1/4 финала",
+    ),
+    "quarters": (
+        ["QUARTER_FINALS", "QUARTER_FINAL"],
+        "1/4 финала",
+    ),
+    "quarter_finals": (
+        ["QUARTER_FINALS", "QUARTER_FINAL"],
+        "1/4 финала",
+    ),
 
-    "1_2": (["SEMI_FINALS"], "1/2 финала"),
-    "1/2": (["SEMI_FINALS"], "1/2 финала"),
-    "semi": (["SEMI_FINALS"], "1/2 финала"),
-    "semis": (["SEMI_FINALS"], "1/2 финала"),
-    "semi_finals": (["SEMI_FINALS"], "1/2 финала"),
+    # 1/2 финала
+    "1_2": (
+        ["SEMI_FINALS", "SEMI_FINAL"],
+        "1/2 финала",
+    ),
+    "1/2": (
+        ["SEMI_FINALS", "SEMI_FINAL"],
+        "1/2 финала",
+    ),
+    "semi": (
+        ["SEMI_FINALS", "SEMI_FINAL"],
+        "1/2 финала",
+    ),
+    "semis": (
+        ["SEMI_FINALS", "SEMI_FINAL"],
+        "1/2 финала",
+    ),
+    "semi_finals": (
+        ["SEMI_FINALS", "SEMI_FINAL"],
+        "1/2 финала",
+    ),
 
-    "third": (["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"], "матча за 3-е место"),
-    "3": (["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"], "матча за 3-е место"),
-    "third_place": (["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"], "матча за 3-е место"),
-    "third-place": (["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"], "матча за 3-е место"),
+    # Матч за 3-е место
+    "third": (
+        ["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"],
+        "матча за 3-е место",
+    ),
+    "3": (
+        ["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"],
+        "матча за 3-е место",
+    ),
+    "third_place": (
+        ["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"],
+        "матча за 3-е место",
+    ),
+    "third-place": (
+        ["THIRD_PLACE", "THIRD_PLACE_PLAYOFF"],
+        "матча за 3-е место",
+    ),
 
-    "final": (["FINAL"], "финала"),
-    "finals": (["FINAL"], "финала"),
+    # Финал
+    "final": (
+        ["FINAL"],
+        "финала",
+    ),
+    "finals": (
+        ["FINAL"],
+        "финала",
+    ),
 }
 
 
@@ -65,6 +149,16 @@ def points_text(points: int) -> str:
         return f"{points} очка"
 
     return f"{points} очков"
+
+
+def exact_text(count: int) -> str:
+    if count == 1:
+        return "1 точный счёт"
+
+    if count in (2, 3, 4):
+        return f"{count} точных счёта"
+
+    return f"{count} точных счетов"
 
 
 def percent_text(value: float) -> str:
@@ -140,6 +234,20 @@ def outcome_label(value: int, home_team: str, away_team: str) -> str:
     return "ничью"
 
 
+def rows_to_matches(rows) -> list[dict]:
+    return [
+        {
+            "id": row[0],
+            "home_team": row[1],
+            "away_team": row[2],
+            "home_score": row[3],
+            "away_score": row[4],
+            "start_time": row[5],
+        }
+        for row in rows
+    ]
+
+
 async def get_finished_matches_by_group_round(matchday: int) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         rows = await (
@@ -150,7 +258,8 @@ async def get_finished_matches_by_group_round(matchday: int) -> list[dict]:
                     home_team,
                     away_team,
                     home_score,
-                    away_score
+                    away_score,
+                    start_time
                 FROM matches
                 WHERE stage = 'GROUP_STAGE'
                   AND matchday = ?
@@ -181,7 +290,8 @@ async def get_finished_matches_by_stages(stages: list[str]) -> list[dict]:
                     home_team,
                     away_team,
                     home_score,
-                    away_score
+                    away_score,
+                    start_time
                 FROM matches
                 WHERE stage IN ({placeholders})
                   AND status = 'finished'
@@ -196,17 +306,28 @@ async def get_finished_matches_by_stages(stages: list[str]) -> list[dict]:
     return rows_to_matches(rows)
 
 
-def rows_to_matches(rows) -> list[dict]:
-    return [
-        {
-            "id": row[0],
-            "home_team": row[1],
-            "away_team": row[2],
-            "home_score": row[3],
-            "away_score": row[4],
-        }
-        for row in rows
-    ]
+async def get_all_finished_matches() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        rows = await (
+            await db.execute(
+                """
+                SELECT
+                    id,
+                    home_team,
+                    away_team,
+                    home_score,
+                    away_score,
+                    start_time
+                FROM matches
+                WHERE status = 'finished'
+                  AND home_score IS NOT NULL
+                  AND away_score IS NOT NULL
+                ORDER BY start_time
+                """
+            )
+        ).fetchall()
+
+    return rows_to_matches(rows)
 
 
 async def get_approved_users() -> list[dict]:
@@ -277,48 +398,15 @@ async def get_predictions_for_matches(match_ids: list[int]) -> list[dict]:
     ]
 
 
-async def get_overall_top(limit: int = 10) -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        rows = await (
-            await db.execute(
-                """
-                SELECT
-                    u.id,
-                    u.display_name,
-                    u.username,
-                    u.first_name,
-                    COALESCE(s.points, 0) AS points
-                FROM users u
-                LEFT JOIN scores s
-                    ON s.user_id = u.id
-                WHERE u.is_approved = 1
-                ORDER BY
-                    points DESC,
-                    u.id ASC
-                LIMIT ?
-                """,
-                (limit,),
-            )
-        ).fetchall()
-
-    return [
-        {
-            "user_id": row[0],
-            "display_name": row[1],
-            "username": row[2],
-            "first_name": row[3],
-            "points": row[4],
-        }
-        for row in rows
-    ]
-
-
 def build_stats(
     users: list[dict],
     matches: list[dict],
     predictions: list[dict],
 ) -> tuple[list[dict], list[dict]]:
-    matches_by_id = {match["id"]: match for match in matches}
+    matches_by_id = {
+        match["id"]: match
+        for match in matches
+    }
 
     player_stats = {}
 
@@ -413,6 +501,26 @@ def build_stats(
     return players, list(match_stats.values())
 
 
+async def get_current_overall_top(limit: int = 10) -> list[dict]:
+    users = await get_approved_users()
+    matches = await get_all_finished_matches()
+
+    if not users or not matches:
+        return []
+
+    predictions = await get_predictions_for_matches(
+        [match["id"] for match in matches]
+    )
+
+    players, _ = build_stats(
+        users=users,
+        matches=matches,
+        predictions=predictions,
+    )
+
+    return players[:limit]
+
+
 def best_round_player(players: list[dict]) -> dict | None:
     if not players:
         return None
@@ -463,14 +571,17 @@ def most_stable_player(players: list[dict]) -> dict | None:
     return candidates[0]
 
 
-def hardest_match(matches: list[dict]) -> dict | None:
+def hardest_matches(
+    matches: list[dict],
+    limit: int = 3,
+) -> list[dict]:
     candidates = [
         match for match in matches
         if match["predictions_count"] > 0
     ]
 
     if not candidates:
-        return None
+        return []
 
     candidates.sort(
         key=lambda item: (
@@ -481,17 +592,20 @@ def hardest_match(matches: list[dict]) -> dict | None:
         )
     )
 
-    return candidates[0]
+    return candidates[:limit]
 
 
-def easiest_match(matches: list[dict]) -> dict | None:
+def easiest_matches(
+    matches: list[dict],
+    limit: int = 3,
+) -> list[dict]:
     candidates = [
         match for match in matches
         if match["predictions_count"] > 0
     ]
 
     if not candidates:
-        return None
+        return []
 
     candidates.sort(
         key=lambda item: (
@@ -502,10 +616,13 @@ def easiest_match(matches: list[dict]) -> dict | None:
         )
     )
 
-    return candidates[0]
+    return candidates[:limit]
 
 
-def surprise_match(matches: list[dict]) -> dict | None:
+def surprise_matches(
+    matches: list[dict],
+    limit: int = 3,
+) -> list[dict]:
     surprises = []
 
     for match in matches:
@@ -515,17 +632,25 @@ def surprise_match(matches: list[dict]) -> dict | None:
         if not match["outcome_votes"]:
             continue
 
-        majority_outcome, majority_count = (
-            match["outcome_votes"].most_common(1)[0]
-        )
+        most_common = match["outcome_votes"].most_common()
+
+        if not most_common:
+            continue
+
+        majority_outcome, majority_count = most_common[0]
+
+        # Если нет явного большинства, не считаем матч сюрпризом.
+        if len(most_common) > 1 and most_common[1][1] == majority_count:
+            continue
 
         if majority_outcome != match["actual_outcome"]:
-            match["majority_outcome"] = majority_outcome
-            match["majority_count"] = majority_count
-            surprises.append(match)
+            item = dict(match)
+            item["majority_outcome"] = majority_outcome
+            item["majority_count"] = majority_count
+            surprises.append(item)
 
     if not surprises:
-        return None
+        return []
 
     surprises.sort(
         key=lambda item: (
@@ -536,17 +661,17 @@ def surprise_match(matches: list[dict]) -> dict | None:
         )
     )
 
-    return surprises[0]
+    return surprises[:limit]
 
 
 def build_round_table_block(
     players: list[dict],
-    matches_count: int
+    matches_count: int,
 ) -> str:
     text = "🏆 <b>Таблица этапа:</b>\n"
 
     if not players:
-        return text + "Нет игроков для отображения.\n"
+        return text + "Нет игроков для отображения."
 
     for index, player in enumerate(players, start=1):
         name = format_player_name(player)
@@ -591,7 +716,7 @@ def build_missing_block(players: list[dict]) -> str:
 
 
 def build_overall_top_block(players: list[dict]) -> str:
-    text = "📌 <b>Общая таблица после этапа:</b>\n"
+    text = "📌 <b>Текущая общая таблица:</b>\n"
 
     if not players:
         return text + "Нет данных."
@@ -599,8 +724,36 @@ def build_overall_top_block(players: list[dict]) -> str:
     for index, player in enumerate(players, start=1):
         text += (
             f"{index}. {format_player_name(player)} — "
-            f"{points_text(player['points'])}\n"
+            f"{points_text(player['points'])} "
+            f"({player['exact']}) "
+            f"(прогнозов: {player['predictions_count']})\n"
         )
+
+    return text.rstrip()
+
+
+def build_match_nomination_list(
+    matches: list[dict],
+    show_majority: bool = False,
+) -> str:
+    text = ""
+
+    for match in matches:
+        text += (
+            f"• {match_result_line(match)}\n"
+            f"  Очки получили: <b>{match['points_getters']}</b> "
+            f"из <b>{match['predictions_count']}</b> · "
+            f"точных: <b>{match['exact']}</b>"
+        )
+
+        if show_majority:
+            text += (
+                f"\n  Большинство: <b>{match['majority_count']}</b> "
+                f"из <b>{match['predictions_count']}</b> — "
+                f"{outcome_label(match['majority_outcome'], match['home_team'], match['away_team'])}"
+            )
+
+        text += "\n"
 
     return text.rstrip()
 
@@ -626,11 +779,16 @@ def build_summary_text(
     round_player = best_round_player(players)
     sniper = best_sniper(players)
     stable = most_stable_player(players)
-    hard_match = hardest_match(match_stats)
-    easy_match = easiest_match(match_stats)
-    surprise = surprise_match(match_stats)
 
-    total_exact = sum(player["exact"] for player in players)
+    hard_matches = hardest_matches(match_stats, limit=3)
+    easy_matches = easiest_matches(match_stats, limit=3)
+    surprises = surprise_matches(match_stats, limit=3)
+
+    total_exact = sum(
+        player["exact"]
+        for player in players
+    )
+
     players_with_exact = sum(
         1 for player in players
         if player["exact"] > 0
@@ -641,7 +799,7 @@ def build_summary_text(
 
         "👥 <b>Участие:</b>\n"
         f"Игроков: <b>{len(users)}</b>\n"
-        f"Матчей в этапе: <b>{len(matches)}</b>\n"
+        f"Матчей в отчёте: <b>{len(matches)}</b>\n"
         f"Сделано прогнозов: <b>{total_predictions}</b> "
         f"из <b>{total_possible_predictions}</b>\n"
         f"Заполнение: <b>{percent_text(fill_rate)}</b>\n\n"
@@ -654,14 +812,14 @@ def build_summary_text(
             "🔥 <b>Игрок этапа:</b>\n"
             f"{format_player_name(round_player)} — "
             f"{points_text(round_player['points'])}, "
-            f"🎯 {round_player['exact']} точных\n\n"
+            f"{exact_text(round_player['exact'])}\n\n"
         )
 
     if sniper:
         text += (
             "🎯 <b>Снайпер этапа:</b>\n"
             f"{format_player_name(sniper)} — "
-            f"{sniper['exact']} точных счетов\n\n"
+            f"{exact_text(sniper['exact'])}\n\n"
         )
 
     if stable:
@@ -672,31 +830,46 @@ def build_summary_text(
             f"из {stable['predictions_count']} прогнозов\n\n"
         )
 
-    if hard_match:
-        text += (
+    if hard_matches:
+        title_text = (
             "😵 <b>Самый сложный матч:</b>\n"
-            f"{match_result_line(hard_match)}\n"
-            f"Очки получили: <b>{hard_match['points_getters']}</b> "
-            f"из <b>{hard_match['predictions_count']}</b> · "
-            f"точных: <b>{hard_match['exact']}</b>\n\n"
+            if len(hard_matches) == 1
+            else "😵 <b>Самые сложные матчи:</b>\n"
         )
 
-    if easy_match:
         text += (
+            title_text
+            + build_match_nomination_list(hard_matches)
+            + "\n\n"
+        )
+
+    if easy_matches:
+        title_text = (
             "✅ <b>Самый предсказуемый матч:</b>\n"
-            f"{match_result_line(easy_match)}\n"
-            f"Очки получили: <b>{easy_match['points_getters']}</b> "
-            f"из <b>{easy_match['predictions_count']}</b> · "
-            f"точных: <b>{easy_match['exact']}</b>\n\n"
+            if len(easy_matches) == 1
+            else "✅ <b>Самые предсказуемые матчи:</b>\n"
         )
 
-    if surprise:
         text += (
+            title_text
+            + build_match_nomination_list(easy_matches)
+            + "\n\n"
+        )
+
+    if surprises:
+        title_text = (
             "🧨 <b>Матч-сюрприз:</b>\n"
-            f"{match_result_line(surprise)}\n"
-            f"Большинство: <b>{surprise['majority_count']}</b> "
-            f"из <b>{surprise['predictions_count']}</b> — "
-            f"{outcome_label(surprise['majority_outcome'], surprise['home_team'], surprise['away_team'])}\n\n"
+            if len(surprises) == 1
+            else "🧨 <b>Матчи-сюрпризы:</b>\n"
+        )
+
+        text += (
+            title_text
+            + build_match_nomination_list(
+                surprises,
+                show_majority=True,
+            )
+            + "\n\n"
         )
 
     text += (
@@ -735,7 +908,7 @@ async def build_group_round_stats_summary(
         predictions=predictions,
     )
 
-    overall_top = await get_overall_top(limit=10)
+    overall_top = await get_current_overall_top(limit=10)
 
     return (
         build_summary_text(
@@ -755,12 +928,11 @@ async def build_stage_stats_summary(
     raw_stage: str,
 ) -> tuple[str | None, str | None]:
     stages, title = normalize_stage_arg(raw_stage)
+
     matches = await get_finished_matches_by_stages(stages)
 
     if not matches:
-        return None, (
-            f"Нет завершённых матчей для этапа {escape(title)}."
-        )
+        return None, f"Нет завершённых матчей для этапа {escape(title)}."
 
     users = await get_approved_users()
 
@@ -777,7 +949,7 @@ async def build_stage_stats_summary(
         predictions=predictions,
     )
 
-    overall_top = await get_overall_top(limit=10)
+    overall_top = await get_current_overall_top(limit=10)
 
     return (
         build_summary_text(
@@ -797,7 +969,9 @@ async def send_group_round_stats_summary(
     bot: Bot,
     matchday: int,
 ) -> tuple[bool, str | None]:
-    text, error = await build_group_round_stats_summary(matchday=matchday)
+    text, error = await build_group_round_stats_summary(
+        matchday=matchday,
+    )
 
     if error:
         return False, error
@@ -817,7 +991,9 @@ async def send_stage_stats_summary(
     bot: Bot,
     raw_stage: str,
 ) -> tuple[bool, str | None]:
-    text, error = await build_stage_stats_summary(raw_stage=raw_stage)
+    text, error = await build_stage_stats_summary(
+        raw_stage=raw_stage,
+    )
 
     if error:
         return False, error
