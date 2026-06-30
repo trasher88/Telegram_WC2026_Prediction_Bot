@@ -31,37 +31,115 @@ def parse_start_time(start_time: str) -> datetime:
     return dt
 
 
+def _to_int(value) -> int | None:
+    """Safely convert API score values to int.
+
+    Some APIs may return scores as strings. Empty values stay None.
+    """
+    if value is None:
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _score_pair(score: dict, key: str) -> tuple[int | None, int | None]:
+    part = score.get(key) or {}
+
+    return (
+        _to_int(part.get("home")),
+        _to_int(part.get("away")),
+    )
+
+
+def _remove_penalty_contamination_if_needed(
+    home_score: int,
+    away_score: int,
+    pen_home: int,
+    pen_away: int,
+) -> tuple[int, int]:
+    """
+    Some APIs may already include penalty kicks in fullTime.
+
+    Example of polluted data:
+        fullTime 5:6, penalties 4:5
+
+    Real score before penalties:
+        5 - 4 = 1
+        6 - 5 = 1
+
+    So we restore 1:1 first and only then add +1 virtual goal
+    to the shootout winner.
+    """
+    if home_score < pen_home or away_score < pen_away:
+        return home_score, away_score
+
+    possible_home_base = home_score - pen_home
+    possible_away_base = away_score - pen_away
+
+    # Before a penalty shootout the match score must be level.
+    # If subtracting penalties gives a draw, the API score was polluted.
+    if possible_home_base == possible_away_base:
+        return possible_home_base, possible_away_base
+
+    return home_score, away_score
+
+
 def extract_tournament_score(score: dict) -> tuple[int | None, int | None]:
     """
     Возвращает счёт, который используется в турнире прогнозов.
 
-    Обычный матч:
-        берём score.fullTime.home / score.fullTime.away
+    Главное правило для серии пенальти:
+        пенальти НЕ прибавляются к счёту матча целиком.
+        Победителю серии пенальти добавляется только +1 виртуальный гол.
 
-    Матч с серией пенальти:
-        берём fullTime-счёт и добавляем +1 гол победителю серии пенальти.
+    Примеры:
+        fullTime 1:1, penalties 4:5 -> 1:2
+        fullTime 0:0, penalties 5:4 -> 1:0
+        fullTime 2:2, penalties 3:4 -> 2:3
 
-    Пример:
-        fullTime 1:1, penalties 4:3 -> 2:1
-        fullTime 1:1, penalties 2:4 -> 1:2
+    Защита от API, который уже прибавил пенальти к fullTime:
+        fullTime 5:6, penalties 4:5 -> 1:2
+        а не 5:6 и не 5:7
     """
-    full_time = score.get("fullTime") or {}
+    home_score, away_score = _score_pair(score, "fullTime")
 
-    home_score = full_time.get("home")
-    away_score = full_time.get("away")
+    # Fallback на случай, если конкретный API не заполнил fullTime.
+    # regularTime безопаснее, чем extraTime, потому что extraTime
+    # в разных API может означать либо счёт после доп. времени,
+    # либо только голы в доп. времени.
+    if home_score is None or away_score is None:
+        home_score, away_score = _score_pair(score, "regularTime")
 
     if home_score is None or away_score is None:
+        return None, None
+
+    pen_home, pen_away = _score_pair(score, "penalties")
+
+    # Пенальти не было или API их не отдал — обычный счёт.
+    if pen_home is None or pen_away is None:
         return home_score, away_score
 
-    penalties = score.get("penalties") or {}
-    pen_home = penalties.get("home")
-    pen_away = penalties.get("away")
+    home_score, away_score = _remove_penalty_contamination_if_needed(
+        home_score=home_score,
+        away_score=away_score,
+        pen_home=pen_home,
+        pen_away=pen_away,
+    )
 
-    if pen_home is not None and pen_away is not None:
-        if pen_home > pen_away:
-            home_score += 1
-        elif pen_away > pen_home:
-            away_score += 1
+    # Пенальти должны быть только после ничьей.
+    # Если после восстановления базы счёт не равный,
+    # не трогаем результат, чтобы не испортить обычный матч.
+    if home_score != away_score:
+        return home_score, away_score
+
+    if pen_home > pen_away:
+        return home_score + 1, away_score
+
+    if pen_away > pen_home:
+        return home_score, away_score + 1
 
     return home_score, away_score
 
